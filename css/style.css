@@ -247,3 +247,28 @@ canvas.wolke{width:100%;display:block}
 .mkarte.auf .vorne,.mkarte.paar .vorne{transform:rotateY(360deg)}
 .mkarte.paar .vorne{border-color:var(--gruen);box-shadow:0 0 0 2px var(--gruen) inset;opacity:.75}
 @media (min-width:520px){.mkarte .mtext{font-size:.82rem}}
+
+/* ================= Präsenz: Punkte & Raster ================= */
+.segment{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.segment button{border:none;background:#fff;padding:9px 14px;font-weight:650;color:var(--muted);cursor:pointer}
+.segment button+button{border-left:1px solid var(--line)}
+.segment button.an{background:var(--navy);color:#fff}
+.pe-name{font-weight:750;color:var(--navy);font-size:1.08rem;line-height:1.25}
+.pe-name small{display:block;font-weight:500;color:var(--muted);font-size:.85rem;margin-top:2px}
+.pe-zeile{display:grid;grid-template-columns:minmax(180px,260px) 1fr;gap:28px;align-items:end;padding:14px 0 8px;border-top:1px solid #edf0f4;break-inside:avoid}
+.pe-zeile:first-child{border-top:none}
+.pe-zeile .pe-name{padding-bottom:24px}
+.pe-skala{position:relative;padding-top:22px}
+.pe-spalten{display:grid;grid-template-columns:repeat(10,1fr);align-items:end;min-height:34px}
+.pe-spalte{display:flex;flex-wrap:wrap-reverse;justify-content:center;gap:3px;padding:0 4px}
+.pe-dot{width:15px;height:15px;border-radius:50%;display:block}
+.pe-achse{display:grid;grid-template-columns:repeat(10,1fr);border-top:1.5px solid #c9d0da;margin-top:4px;padding-top:3px;font-size:.82rem;color:#8b95a3;text-align:center}
+.pe-linie{position:absolute;top:2px;bottom:20px;border-left:2px dashed}
+.pe-linie span{position:absolute;top:-4px;left:6px;font-size:.85rem;font-weight:800;white-space:nowrap}
+.pe-raster{display:grid;align-items:center}
+.pe-kopf{font-size:.85rem;color:#8b95a3;text-align:center;padding-bottom:8px;font-weight:650}
+.pe-zelle{height:70px;display:flex;align-items:center;justify-content:center;border-top:1px solid #edf0f4}
+.pe-zelle.pe-links{justify-content:flex-start;padding-right:12px}
+.pe-kreis{border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.9rem;transition:width .3s,height .3s}
+.pe-wert{font-weight:850;color:var(--navy);font-size:1.25rem}
+@media (max-width:760px){.pe-zeile{grid-template-columns:1fr;gap:4px}.pe-zeile .pe-name{padding-bottom:0}}

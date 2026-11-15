@@ -249,7 +249,7 @@
     if (!kurs) return gehe("#/");
     let block = kurs.bloecke.find((b) => b.key === key) || kurs.bloecke[0];
     if (!block) return gehe("#/kurs/" + id);
-    const zustand = { modus: "einzeln", idx: 0, schnitt: PNA.ls.get("pna-schnitt", true) };
+    const zustand = { modus: "einzeln", idx: 0, schnitt: PNA.ls.get("pna-schnitt-v2", false), ansicht: PNA.ls.get("pna-praesenz-ansicht", "punkte") };
     let antworten = [], signatur = "";
 
     const steuerung = h("div", { class: "zeile no-print" });
@@ -299,8 +299,14 @@
       }
       if (block.typ === "werte") steuerung.appendChild(h("button", { class: "btn", onclick: wolkeBild }, "Bild (PNG)"));
       if (block.typ === "praesenz" || (block.typ === "auswertung" && (block.config.fragen || []).some((f) => f.typ === "skala"))) {
-        steuerung.appendChild(h("button", { class: "btn" + (zustand.schnitt ? "" : " aus"), title: "Durchschnitt ein-/ausblenden", onclick: () => {
-          zustand.schnitt = !zustand.schnitt; PNA.ls.set("pna-schnitt", zustand.schnitt); zeichnen();
+        if (block.typ === "praesenz") {
+          steuerung.appendChild(h("div", { class: "segment" },
+            [["punkte", "Punkte"], ["raster", "Raster"]].map(([k, t]) => h("button", { class: zustand.ansicht === k ? "an" : "", onclick: () => {
+              zustand.ansicht = k; PNA.ls.set("pna-praesenz-ansicht", k); zeichnen();
+            } }, t))));
+        }
+        steuerung.appendChild(h("button", { class: "btn", title: "Durchschnitt ein-/ausblenden", onclick: () => {
+          zustand.schnitt = !zustand.schnitt; PNA.ls.set("pna-schnitt-v2", zustand.schnitt); zeichnen();
         } }, zustand.schnitt ? "Ø ausblenden" : "Ø einblenden"));
       }
       steuerung.append(

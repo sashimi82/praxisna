@@ -232,28 +232,48 @@
       }
     },
 
-    // Präsenz-Ebenen
+    // Präsenz-Ebenen: Ansicht «punkte» (Vorschlag B) oder «raster» (Vorschlag C)
     praesenz(ziel, block, antworten, zustand) {
-      const mitSchnitt = !(zustand && zustand.schnitt === false);
+      zustand = zustand || {};
+      const mitSchnitt = zustand.schnitt === true;
+      const ansicht = zustand.ansicht === "raster" ? "raster" : "punkte";
       const ebenen = block.config.ebenen || [];
-      const wrap = h("div");
-      ziel.appendChild(h("p", { class: "muted" }, anzahlText(antworten.length, "Einschätzung", "Einschätzungen"), " · anonym"));
-      ebenen.forEach((e, ei) => {
-        const werte = antworten.map((a) => a.daten && a.daten.ratings && a.daten.ratings[e.id]).filter((v) => typeof v === "number");
-        const zaehl = Array(10).fill(0); werte.forEach((v) => { if (v >= 1 && v <= 10) zaehl[v - 1]++; });
-        const maxN = Math.max(1, ...zaehl);
-        const schnitt = werte.length ? werte.reduce((s, v) => s + v, 0) / werte.length : null;
-        const farbe = PNA.EBENEN_FARBEN[ei % PNA.EBENEN_FARBEN.length];
-        wrap.appendChild(h("div", { class: "ebene", style: mitSchnitt ? null : { gridTemplateColumns: "260px 1fr" } },
-          h("div", null, h("div", { class: "zeile", style: { flexWrap: "nowrap", alignItems: "flex-start" } }, h("div", { class: "hex", style: { background: farbe, width: "26px", height: "30px" } }), h("div", { class: "name" }, e.name)),
-            e.untertitel ? h("div", { class: "unter" }, e.untertitel) : null),
-          h("div", null,
-            h("div", { class: "histo" }, zaehl.map((n) => h("div", { class: "s" }, h("div", { class: "n" }, n || ""),
-              h("div", { class: "bar", style: { height: (n / maxN) * 88 + "%", background: n ? farbe : "#e6eaf0" } })))),
-            h("div", { class: "histo-achse" }, zaehl.map((_, i) => h("div", null, i + 1)))),
-          mitSchnitt ? h("div", { class: "schnitt" }, h("div", { class: "wert" }, schnitt === null ? "–" : schnitt.toFixed(1).replace(".", ",")), h("div", { class: "lbl" }, "Durchschnitt")) : null));
+      const fmt = (x) => x.toFixed(1).replace(".", ",");
+      const daten = ebenen.map((e, ei) => {
+        const werte = antworten.map((a) => a.daten && a.daten.ratings && a.daten.ratings[e.id]).filter((v) => typeof v === "number" && v >= 1 && v <= 10);
+        const zaehl = Array(10).fill(0); werte.forEach((v) => zaehl[v - 1]++);
+        return { e, zaehl, n: werte.length, schnitt: werte.length ? werte.reduce((s, v) => s + v, 0) / werte.length : null, farbe: PNA.EBENEN_FARBEN[ei % PNA.EBENEN_FARBEN.length] };
       });
-      ziel.appendChild(wrap);
+      ziel.appendChild(h("p", { class: "muted" }, anzahlText(antworten.length, "Einschätzung", "Einschätzungen"), " · anonym", ansicht === "raster" ? " · Kreisgrösse = Anzahl Personen" : ""));
+      const name = (d) => h("div", { class: "pe-name" }, d.e.name, d.e.untertitel ? h("small", null, d.e.untertitel) : null);
+
+      if (ansicht === "punkte") {
+        const wrap = h("div", { class: "pe-punkte" });
+        daten.forEach((d) => {
+          const skala = h("div", { class: "pe-skala" },
+            h("div", { class: "pe-spalten" }, d.zaehl.map((n) => h("div", { class: "pe-spalte" }, Array.from({ length: n }, () => h("span", { class: "pe-dot", style: { background: d.farbe } }))))),
+            h("div", { class: "pe-achse" }, d.zaehl.map((_, i) => h("div", null, i + 1))));
+          if (mitSchnitt && d.schnitt !== null) {
+            skala.appendChild(h("div", { class: "pe-linie", style: { left: ((d.schnitt - 0.5) / 10) * 100 + "%", borderColor: d.farbe } },
+              h("span", { style: { color: d.farbe } }, "Ø " + fmt(d.schnitt))));
+          }
+          wrap.appendChild(h("div", { class: "pe-zeile" }, name(d), skala));
+        });
+        ziel.appendChild(wrap);
+      } else {
+        const maxN = Math.max(1, ...daten.flatMap((d) => d.zaehl));
+        const grid = h("div", { class: "pe-raster", style: { gridTemplateColumns: `minmax(180px,260px) repeat(10,1fr)${mitSchnitt ? " 90px" : ""}` } },
+          h("div"), Array.from({ length: 10 }, (_, i) => h("div", { class: "pe-kopf" }, i + 1)), mitSchnitt ? h("div", { class: "pe-kopf" }, "Ø") : null);
+        daten.forEach((d) => {
+          grid.appendChild(h("div", { class: "pe-zelle pe-links" }, name(d)));
+          d.zaehl.forEach((n) => {
+            const g = 20 + (n / maxN) * 40;
+            grid.appendChild(h("div", { class: "pe-zelle" }, n ? h("div", { class: "pe-kreis", style: { background: d.farbe, width: g + "px", height: g + "px", opacity: 0.55 + 0.45 * (n / maxN) } }, n) : null));
+          });
+          if (mitSchnitt) grid.appendChild(h("div", { class: "pe-zelle pe-wert" }, d.schnitt === null ? "–" : fmt(d.schnitt)));
+        });
+        ziel.appendChild(grid);
+      }
     },
 
     // Werte-Wolke
@@ -293,7 +313,7 @@
               h("div", { class: "histo", style: { gridTemplateColumns: `repeat(${max},1fr)` } }, z.map((n) => h("div", { class: "s" }, h("div", { class: "n" }, n || ""), h("div", { class: "bar", style: { height: (n / m) * 88 + "%", background: n ? farbe : "#e6eaf0" } })))),
               h("div", { class: "histo-achse", style: { gridTemplateColumns: `repeat(${max},1fr)` } }, z.map((_, i) => h("div", null, i + 1))),
               h("div", { class: "skala-enden" }, h("span", null, f.links || ""), h("span", null, f.rechts || ""))),
-            zustand && zustand.schnitt === false ? null : h("div", { class: "schnitt", style: { minWidth: "120px" } }, h("div", { class: "wert" }, schnitt === null ? "–" : schnitt.toFixed(1).replace(".", ",")), h("div", { class: "lbl" }, `Durchschnitt (n = ${werte.length})`))));
+            !(zustand && zustand.schnitt === true) ? null : h("div", { class: "schnitt", style: { minWidth: "120px" } }, h("div", { class: "wert" }, schnitt === null ? "–" : schnitt.toFixed(1).replace(".", ",")), h("div", { class: "lbl" }, `Durchschnitt (n = ${werte.length})`))));
         } else if (f.typ === "daumen") {
           const hoch = werte.filter((v) => v === "hoch").length, runter = werte.filter((v) => v === "runter").length, t = Math.max(1, hoch + runter);
           k.appendChild(h("div", { class: "daumen-ergebnis" },
