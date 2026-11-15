@@ -32,7 +32,7 @@
     const knopf = h("button", { class: "btn primaer gross", style: { width: "100%" }, type: "submit" }, "Anmelden");
     const form = h("form", { class: "karte", style: { maxWidth: "420px", margin: "60px auto" } },
       h("img", { src: "assets/logo.png", alt: "praxisNA", style: { height: "44px", marginBottom: "6px" } }),
-      h("h1", null, "Moderation"), PNA.bogen(),
+      h("h1", null, "Moderation"),
       meldung ? h("p", { style: { color: "#a3202a", fontWeight: 650 } }, meldung) : null,
       h("label", { class: "feld" }, h("span", null, "E-Mail"), email),
       h("label", { class: "feld" }, h("span", null, "Passwort"), pw), knopf);
@@ -81,7 +81,7 @@
     m.appendChild(h("p", { class: "muted" }, "Laden …"));
     const [kurse, bausteine] = await Promise.all([api.kurse(), api.bausteine()]);
     PNA.leeren(m);
-    m.appendChild(h("div", { class: "zeile spread" }, h("div", null, h("h1", null, "Kurse"), PNA.bogen()),
+    m.appendChild(h("div", { class: "zeile spread" }, h("div", null, h("h1", null, "Kurse")),
       h("button", { class: "btn primaer", onclick: () => gehe("#/kurs-neu"), disabled: !bausteine.length }, "+ Neuer Kurs")));
 
     if (!bausteine.length) {
@@ -135,7 +135,7 @@
       }
       knopf.disabled = false; toast("Code-Vergabe fehlgeschlagen – bitte nochmals.", true);
     });
-    m.append(h("a", { href: "#/", class: "small" }, "← Kurse"), h("h1", null, "Neuer Kurs"), PNA.bogen(),
+    m.append(h("a", { href: "#/", class: "small" }, "← Kurse"), h("h1", null, "Neuer Kurs"),
       h("div", { class: "karte" }, h("label", { class: "feld" }, h("span", null, "Titel"), titel), h("label", { class: "feld", style: { maxWidth: "220px" } }, h("span", null, "Datum"), datum)),
       h("div", { class: "karte" }, h("h2", null, "Bausteine für diesen Kurs"), h("p", { class: "muted small" }, "Die Reihenfolge kannst du danach anpassen. Die Inhalte werden in den Kurs kopiert – spätere Änderungen an der Vorlage verändern diesen Kurs nicht (ausser du aktualisierst ihn bewusst)."),
         bausteinWahl(bausteine, gewaehlt)), knopf);
@@ -217,7 +217,7 @@
           const t = prompt("Titel des Kurses:", kurs.titel); if (!t || !t.trim()) return;
           try { kurs = await api.kursAendern(kurs.id, { titel: t.trim() }); titelEl.textContent = kurs.titel; } catch (e) { fehler(e); }
         } }, "Titel ändern")),
-      PNA.bogen(),
+     
       h("div", { class: "karte" }, h("h2", null, "So machen die Teilnehmenden mit"),
         h("div", { class: "beitritt" }, PNA.qrCanvas(url, 170),
           h("div", null, h("div", { class: "small muted" }, "Kurscode"), h("div", { class: "code-gross" }, kurs.code),
@@ -266,7 +266,7 @@
     const inhalt = h("div");
     const main = h("div", { class: "live-main" },
       h("div", { class: "print-kopf" }, h("img", { src: "assets/logo.png", alt: "praxisNA" }), h("div", { class: "muted" }, kurs.titel, kurs.datum ? " · " + PNA.datumText(kurs.datum) : "")),
-      h("div", { class: "live-titel" }, h("div", null, h("h1", null, block.titel), PNA.bogen()), offenSchalter), inhalt);
+      h("div", { class: "live-titel" }, h("div", null, h("h1", null, block.titel)), offenSchalter), inhalt);
     app.appendChild(main);
     app.appendChild(h("div", { class: "live-fuss" }, h("span", null, h("span", { class: "puls" }), "live"),
       h("span", null, "Mitmachen: ", h("b", { style: { letterSpacing: "0" } }, PNA.teilnahmeUrlKurz(kurs.code)), " · Code ", h("b", null, kurs.code))));
@@ -372,7 +372,7 @@
   async function bausteineSeite() {
     const m = rahmen("bausteine");
     const bausteine = await api.bausteine();
-    m.append(h("h1", null, "Bausteine"), PNA.bogen(), h("p", { class: "muted" }, "Hier gestaltest du die Vorlagen. Beim Anlegen eines Kurses wählst du daraus aus."));
+    m.append(h("h1", null, "Bausteine"), h("p", { class: "muted" }, "Hier gestaltest du die Vorlagen. Beim Anlegen eines Kurses wählst du daraus aus."));
     if (!bausteine.length) m.appendChild(h("div", { class: "karte" }, h("p", null, "Noch keine Bausteine."),
       h("button", { class: "btn akzent", onclick: async (e) => { e.target.disabled = true; try { for (const b of PNA.startVorlagen()) await api.bausteinSpeichern(b); route(); } catch (err) { fehler(err); } } }, "Startvorlagen anlegen")));
     PNA.TYP_REIHENFOLGE.forEach((typ) => {
@@ -514,7 +514,7 @@
     });
 
     m.append(h("a", { href: "#/bausteine", class: "small" }, "← Bausteine"),
-      h("div", { class: "zeile" }, PNA.hex(b.typ), h("h1", { style: { margin: 0 } }, (idOderNeu === "neu" ? "Neu: " : "") + PNA.TYPEN[b.typ].name)), PNA.bogen(),
+      h("div", { class: "zeile" }, PNA.hex(b.typ), h("h1", { style: { margin: 0 } }, (idOderNeu === "neu" ? "Neu: " : "") + PNA.TYPEN[b.typ].name)),
       h("div", { class: "karte" }, h("label", { class: "feld" }, h("span", null, "Titel"), titel), bereich),
       h("div", { class: "zeile" }, speichern, h("a", { class: "btn", href: "#/bausteine" }, "Abbrechen")));
   }

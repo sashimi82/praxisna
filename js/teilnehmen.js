@@ -84,7 +84,7 @@
   }
 
   function startseite() {
-    app.append(h("h1", null, S.kurs.titel), PNA.bogen());
+    app.append(h("h1", null, S.kurs.titel));
     if (!S.kurs.bloecke.length) {
       app.appendChild(h("div", { class: "karte leer" }, h("p", null, h("span", { class: "puls" }), "Gleich geht's los."), h("p", { class: "small" }, "Sobald die Kursleitung eine Übung öffnet, erscheint sie hier automatisch.")));
       return;
@@ -104,7 +104,7 @@
 
   // ---------- Memory ----------
   async function memory(block) {
-    app.append(h("h1", null, "Memory"), PNA.bogen());
+    app.append(h("h1", null, "Memory"));
     const bereich = h("div", null, h("p", { class: "muted" }, "Karten werden gemischt …"));
     app.appendChild(bereich);
     let daten;
@@ -203,7 +203,7 @@
       const inp = h("input", { type: "text", placeholder: "z. B. Gruppe 3 oder eure Vornamen", maxlength: 60 });
       const weiter = () => { const g = inp.value.trim(); if (!g) return inp.focus(); st.gruppe = g; lokalSetzen(block.key, st); zeigen(); };
       inp.addEventListener("keydown", (e) => { if (e.key === "Enter") weiter(); });
-      app.append(h("h1", null, block.titel), PNA.bogen(),
+      app.append(h("h1", null, block.titel),
         h("div", { class: "karte" }, h("h2", null, "Wie heisst eure Gruppe?"), h("p", { class: "muted small" }, "Der Name erscheint auf der Leinwand bei euren Sätzen. Pro Gruppe genügt ein Handy."),
           inp, h("div", { style: { height: "12px" } }), h("button", { class: "btn primaer gross", style: { width: "100%" }, onclick: weiter }, "Weiter")));
       setTimeout(() => inp.focus(), 50);
@@ -217,7 +217,7 @@
       stand.textContent = `${n} von ${items.length} Sätzen gespeichert`;
       balken.style.width = (items.length ? (n / items.length) * 100 : 0) + "%";
     };
-    app.append(h("h1", null, block.titel), PNA.bogen(),
+    app.append(h("h1", null, block.titel),
       h("div", { class: "zeile spread" }, h("div", null, "Gruppe: ", h("b", null, st.gruppe)),
         h("button", { class: "btn klein", onclick: () => { const g = prompt("Gruppenname ändern:", st.gruppe); if (g && g.trim()) { st.gruppe = g.trim(); lokalSetzen(block.key, st); if (st.gesendet) senden(block, st.gruppe, st.gesendet); zeigen(); } } }, "ändern")),
       block.config.anleitung ? h("p", { class: "muted small" }, block.config.anleitung) : null,
@@ -263,7 +263,7 @@
     const st = lokal(block.key);
     const ebenen = block.config.ebenen || [];
     const wahl = { ...((st.gesendet && st.gesendet.ratings) || {}), ...(st.entwurf.ratings || {}) };
-    app.append(h("h1", null, block.titel), PNA.bogen(), block.config.anleitung ? h("p", { class: "muted" }, block.config.anleitung) : null);
+    app.append(h("h1", null, block.titel), block.config.anleitung ? h("p", { class: "muted" }, block.config.anleitung) : null);
     const knopf = h("button", { class: "btn primaer gross", style: { width: "100%" } });
     const info = h("div", { class: "small muted", style: { textAlign: "center", marginTop: "6px" } });
     const aktual = () => {
@@ -302,7 +302,7 @@
     const st = lokal(block.key);
     const n = Math.max(1, Math.min(8, block.config.anzahl || 3));
     const start = st.entwurf.werte || (st.gesendet && st.gesendet.werte) || [];
-    app.append(h("h1", null, block.titel), PNA.bogen(), h("p", { style: { fontWeight: 650, color: "#162c4a", fontSize: "1.1rem" } }, block.config.frage || ""),
+    app.append(h("h1", null, block.titel), h("p", { style: { fontWeight: 650, color: "#162c4a", fontSize: "1.1rem" } }, block.config.frage || ""),
       h("p", { class: "small muted" }, "Pro Feld ein Wert – am besten ein einzelnes Wort."));
     const felder = Array.from({ length: n }, (_, i) => {
       const f = h("input", { type: "text", maxlength: 40, placeholder: `Wert ${i + 1}`, value: start[i] || "" });
@@ -332,7 +332,7 @@
     const fragen = block.config.fragen || [];
     const ant = { ...((st.gesendet && st.gesendet.antworten) || {}), ...(st.entwurf.antworten || {}) };
     const merken = () => { st.entwurf.antworten = ant; lokalSetzen(block.key, st); aktual(); };
-    app.append(h("h1", null, block.titel), PNA.bogen(), block.config.anleitung ? h("p", { class: "muted" }, block.config.anleitung) : null);
+    app.append(h("h1", null, block.titel), block.config.anleitung ? h("p", { class: "muted" }, block.config.anleitung) : null);
 
     fragen.forEach((f, fi) => {
       const k = h("div", { class: "satz-karte" }, h("h3", null, `${fi + 1}. ${f.text}`));

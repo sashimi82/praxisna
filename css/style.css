@@ -146,7 +146,7 @@ body.live{background:#fff}
 .live-kopf .tabs a{text-decoration:none;color:var(--muted);font-weight:650;padding:7px 12px;border-radius:10px;font-size:.92rem}
 .live-kopf .tabs a.aktiv{background:#eef1f6;color:var(--navy)}
 .live-main{padding:26px 40px 70px;max-width:1500px;margin:0 auto}
-.live-titel{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:6px}
+.live-titel{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:14px}
 .live-titel h1{font-size:2rem;margin:0}
 .live-fuss{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.95);border-top:1px solid var(--line);padding:8px 24px;font-size:.95rem;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
 .live-fuss b{color:var(--navy);letter-spacing:.08em}
