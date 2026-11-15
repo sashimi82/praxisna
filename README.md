@@ -39,6 +39,9 @@ Nach 1–2 Minuten ist die App erreichbar unter `https://<benutzername>.github.i
 
 ---
 
+## Updates
+- **Update 2 (Memory):** `supabase/update-02-memory.sql` einmal im SQL Editor ausführen (in `setup.sql` bereits enthalten).
+
 ## Gut zu wissen
 - **Kostenloser Supabase-Plan:** Projekte werden nach rund einer Woche ohne Nutzung pausiert. Vor einem Kurs kurz im Supabase-Dashboard prüfen und ggf. **Restore project** klicken (dauert ein paar Minuten, die Daten bleiben erhalten).
 - **Datenschutz:** Es werden keine Namen von Teilnehmenden gespeichert – nur Gruppennamen (Sätze) bzw. anonyme Antworten. Nach dem Kurs können Antworten oder der ganze Kurs gelöscht werden.

@@ -226,3 +226,24 @@ canvas.wolke{width:100%;display:block}
 }
 .print-kopf{display:none;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--line);padding-bottom:8px}
 .print-kopf img{height:30px}
+
+/* ================= Memory (Teilnehmende) ================= */
+.memory-knopf{border-color:#e7d3dc}
+.memory-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (min-width:520px){.memory-grid{grid-template-columns:repeat(4,1fr)}}
+.mkarte{position:relative;aspect-ratio:3/4;border:none;padding:0;background:none;cursor:pointer;perspective:800px;font:inherit;text-align:left}
+.mkarte>div{position:absolute;inset:0;border-radius:12px;backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .35s ease}
+.mkarte .rueck{background:var(--navy);display:flex;align-items:center;justify-content:center;gap:1px;color:#fff;font-size:1.05rem;
+  background-image:radial-gradient(circle at 78% 22%,var(--bordeaux-2) 0 6px,transparent 7px),radial-gradient(circle at 22% 82%,var(--bordeaux-2) 0 4px,transparent 5px)}
+.mkarte .rueck span{font-weight:400;opacity:.9}
+.mkarte .vorne{transform:rotateY(180deg);background:#fff;border:2px solid var(--line);padding:7px 8px;display:flex;flex-direction:column;overflow:hidden}
+.mkarte .vorne.alt{background:#faf5f7;border-color:#e3c7d3}
+.mkarte .vorne.neu{background:#f2f9f4;border-color:#b9dfc6}
+.mkarte .mkopf{display:flex;justify-content:space-between;align-items:center;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:var(--muted);margin-bottom:3px}
+.mkarte .mkopf span:last-child{font-size:1.1rem;letter-spacing:0}
+.mkarte .vorne.alt .mtext{color:var(--bordeaux)}
+.mkarte .mtext{font-size:.74rem;line-height:1.28;color:var(--navy);font-weight:600;overflow-y:auto;flex:1}
+.mkarte.auf .rueck,.mkarte.paar .rueck{transform:rotateY(180deg)}
+.mkarte.auf .vorne,.mkarte.paar .vorne{transform:rotateY(360deg)}
+.mkarte.paar .vorne{border-color:var(--gruen);box-shadow:0 0 0 2px var(--gruen) inset;opacity:.75}
+@media (min-width:520px){.mkarte .mtext{font-size:.82rem}}

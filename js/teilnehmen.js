@@ -42,16 +42,18 @@
       if (!k) { if (erstes) codeEingabe(`Der Kurscode «${S.code}» wurde nicht gefunden.`); return; }
       S.token = ls.get("pna-token-" + S.code, null) || PNA.uuid();
       ls.set("pna-token-" + S.code, S.token);
-      const sig = JSON.stringify(k.bloecke.map((b) => [b.key, b.titel, b.config]));
+      k.bloecke.forEach((b) => { if (b.offen === undefined) b.offen = true; });
+      const sig = JSON.stringify(k.bloecke.map((b) => [b.key, b.titel, b.config, b.offen, b.memory]));
       const geaendert = sig !== S.blockSignatur;
       S.kurs = k; S.blockSignatur = sig;
       if (erstes) {
-        if (!location.hash && k.bloecke.length === 1) { history.replaceState(null, "", "#" + k.bloecke[0].key); }
+        if (!location.hash && k.bloecke.length === 1 && k.bloecke[0].offen && !k.bloecke[0].memory) { history.replaceState(null, "", "#" + k.bloecke[0].key); }
         zeigen();
       } else if (geaendert) {
-        const aktiv = location.hash.slice(1);
+        const [aktiv, teil] = location.hash.slice(1).split("/");
+        const b = k.bloecke.find((x) => x.key === aktiv);
         if (!aktiv) zeigen();
-        else if (!k.bloecke.some((b) => b.key === aktiv)) { toast("Dieser Teil wurde von der Kursleitung geschlossen."); location.hash = ""; }
+        else if (!b || (teil === "memory" ? !b.memory : !b.offen)) { toast("Dieser Teil wurde von der Kursleitung geschlossen."); location.hash = ""; }
       }
     } catch (e) {
       if (erstes) {
@@ -63,14 +65,22 @@
 
   function zeigen() {
     if (!S.kurs) return;
-    const key = location.hash.slice(1);
+    const [key, teil] = location.hash.slice(1).split("/");
     const block = S.kurs.bloecke.find((b) => b.key === key);
     PNA.leeren(app);
     app.appendChild(kopf());
     window.scrollTo(0, 0);
     if (!block) return startseite();
-    if (S.kurs.bloecke.length > 1) app.appendChild(h("button", { class: "zurueck", onclick: () => (location.hash = "") }, "← Übersicht"));
-    ({ saetze, praesenz, werte, auswertung }[block.typ])(block);
+    const zurueck = () => h("button", { class: "zurueck", onclick: () => (location.hash = "") }, "← Zur Übersicht");
+    app.appendChild(zurueck());
+    if (teil === "memory" || !block.offen) {
+      if (!block.memory) { location.hash = ""; return; }
+      memory(block);
+    } else {
+      ({ saetze, praesenz, werte, auswertung }[block.typ])(block);
+    }
+    app.appendChild(h("div", { style: { textAlign: "center", marginTop: "18px" } },
+      h("button", { class: "btn", onclick: () => (location.hash = "") }, "← Zurück zur Übersicht")));
   }
 
   function startseite() {
@@ -82,10 +92,97 @@
     app.appendChild(h("p", { class: "muted" }, "Wähle aus:"));
     S.kurs.bloecke.forEach((b) => {
       const l = lokal(b.key);
-      app.appendChild(h("button", { class: "block-knopf", onclick: () => (location.hash = b.key) }, PNA.hex(b.typ),
+      if (b.offen) app.appendChild(h("button", { class: "block-knopf", onclick: () => (location.hash = b.key) }, PNA.hex(b.typ),
         h("div", { class: "grow" }, h("div", { class: "titel" }, b.titel), h("div", { class: "small muted" }, PNA.TYPEN[b.typ].name)),
         l.gesendet ? h("span", { class: "chip ok" }, "✓") : h("span", { style: { fontSize: "1.3rem", color: "#9aa3b0" } }, "›")));
+      if (b.memory) app.appendChild(h("button", { class: "block-knopf memory-knopf", onclick: () => (location.hash = b.key + "/memory") },
+        h("div", { class: "hex", style: { background: "var(--bordeaux)" } }, "M"),
+        h("div", { class: "grow" }, h("div", { class: "titel" }, "Memory spielen"), h("div", { class: "small muted" }, "mit den Sätzen der anderen Gruppen")),
+        h("span", { style: { fontSize: "1.3rem", color: "#9aa3b0" } }, "›")));
     });
+  }
+
+  // ---------- Memory ----------
+  async function memory(block) {
+    app.append(h("h1", null, "Memory"), PNA.bogen());
+    const bereich = h("div", null, h("p", { class: "muted" }, "Karten werden gemischt …"));
+    app.appendChild(bereich);
+    let daten;
+    try { daten = await api.memoryLaden(S.code, block.key, S.token); }
+    catch (e) { PNA.leeren(bereich).appendChild(h("div", { class: "karte" }, "Die Karten konnten nicht geladen werden. Bitte versuche es nochmals.")); return; }
+    const items = block.config.items || [];
+    const pool = items.map((it) => ({ it, antworten: daten.filter((d) => d.item === it.id) })).filter((x) => x.antworten.length);
+    if (pool.length < 2) {
+      PNA.leeren(bereich).appendChild(h("div", { class: "karte leer" }, h("p", null, "Es gibt noch zu wenige Sätze der anderen Gruppen."),
+        h("button", { class: "btn primaer", onclick: zeigen }, "Nochmals versuchen")));
+      return;
+    }
+    const mischen = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    let mitSymbolen = PNA.ls.get("pna-memory-symbole", true);
+    const auswahl = () => {
+      PNA.leeren(bereich);
+      const n = pool.length;
+      const optionen = [...new Set([Math.min(4, n), Math.min(6, n), Math.min(8, n), n])].filter((x) => x >= 2);
+      const stufe = h("div", { class: "zeile" });
+      const zeichneStufe = () => {
+        PNA.leeren(stufe).append(
+          h("button", { class: "btn " + (mitSymbolen ? "primaer" : ""), onclick: () => { mitSymbolen = true; PNA.ls.set("pna-memory-symbole", true); zeichneStufe(); } }, "Leichter – mit Symbolen"),
+          h("button", { class: "btn " + (!mitSymbolen ? "primaer" : ""), onclick: () => { mitSymbolen = false; PNA.ls.set("pna-memory-symbole", false); zeichneStufe(); } }, "Schwerer – ohne Symbole"));
+      };
+      zeichneStufe();
+      bereich.append(h("p", null, "Findet die Paare: Zu jedem Satz der ", h("b", { style: { color: "var(--bordeaux)" } }, "alten Autorität"), " gehört eine Formulierung der ",
+        h("b", { style: { color: "#17673a" } }, "neuen Autorität"), " – geschrieben von einer anderen Gruppe."),
+        h("p", { class: "muted small", style: { marginBottom: "6px" } }, "1. Schwierigkeit wählen"), stufe,
+        h("p", { class: "muted small", style: { margin: "16px 0 6px" } }, "2. Wie viele Paare möchtet ihr spielen?"),
+        h("div", { class: "zeile" }, optionen.map((k) => h("button", { class: "btn akzent", onclick: () => spiel(k) }, k === n ? `Alle (${k})` : `${k} Paare`))));
+    };
+    const spiel = (k) => {
+      const paare = mischen(pool.slice()).slice(0, k).map((p, i) => ({ i, it: p.it, neu: p.antworten[Math.floor(Math.random() * p.antworten.length)] }));
+      const karten = mischen(paare.flatMap((p) => [{ paar: p.i, art: "alt", text: p.it.text, symbol: p.it.symbol }, { paar: p.i, art: "neu", text: p.neu.text, symbol: p.it.symbol }]));
+      let offen = [], gefunden = 0, zuege = 0;
+      const stand = h("div", { class: "zeile spread small muted", style: { marginBottom: "10px" } });
+      const standText = () => { stand.textContent = `Gefunden: ${gefunden} / ${paare.length}  ·  Züge: ${zuege}`; };
+      const grid = h("div", { class: "memory-grid" });
+      const els = karten.map((kt) => {
+        const el = h("button", { class: "mkarte", "aria-label": "Karte" },
+          h("div", { class: "rueck" }, h("span", null, "praxis"), h("b", null, "NA")),
+          h("div", { class: "vorne " + kt.art }, h("div", { class: "mkopf" }, h("span", null, kt.art === "alt" ? "alt" : "neu"), h("span", null, mitSymbolen ? kt.symbol || "" : "")), h("div", { class: "mtext" }, kt.text)));
+        el.addEventListener("click", () => tippen(kt, el));
+        return el;
+      });
+      const tippen = (kt, el) => {
+        if (el.classList.contains("paar")) return;
+        if (offen.length === 2) { offen.forEach((o) => o.el.classList.remove("auf")); offen = []; }
+        if (el.classList.contains("auf")) return;
+        el.classList.add("auf"); offen.push({ kt, el });
+        if (offen.length === 2) {
+          zuege++;
+          const [a, b] = offen;
+          if (a.kt.paar === b.kt.paar) {
+            gefunden++; a.el.classList.add("paar"); b.el.classList.add("paar"); offen = [];
+            if (gefunden === paare.length) setTimeout(fertig, 700);
+          }
+          standText();
+        }
+      };
+      const fertig = () => {
+        PNA.leeren(bereich);
+        bereich.append(h("div", { class: "karte", style: { textAlign: "center" } }, h("div", { style: { fontSize: "2.4rem" } }, "🎉"),
+          h("h2", null, "Geschafft!"), h("p", { class: "muted" }, `Alle ${paare.length} Paare in ${zuege} Zügen gefunden.`),
+          h("div", { class: "zeile", style: { justifyContent: "center" } }, h("button", { class: "btn primaer", onclick: auswahl }, "Nochmals spielen"))),
+          h("h3", { style: { marginTop: "18px" } }, "Alle Paare zum Nachlesen"),
+          ...paare.map((p) => h("div", { class: "satz-karte" },
+            h("div", { class: "satz-alt" }, p.it.symbol ? h("div", { class: "sym" }, p.it.symbol) : null, h("div", null, h("div", { class: "label-klein" }, "Alte Autorität"), h("div", { class: "txt" }, p.it.text))),
+            h("div", { class: "label-klein" }, "Neue Autorität"), h("div", { style: { color: "var(--navy)", fontWeight: 600 } }, p.neu.text),
+            p.neu.gruppe ? h("div", { class: "small muted", style: { marginTop: "4px" } }, p.neu.gruppe) : null)));
+        window.scrollTo(0, 0);
+      };
+      PNA.leeren(bereich);
+      standText();
+      bereich.append(stand, h("p", { class: "small muted", style: { marginTop: 0 } }, "Tippe zwei Karten an. Passen sie nicht, tippe einfach weiter."), grid);
+      els.forEach((e) => grid.appendChild(e));
+    };
+    auswahl();
   }
 
   async function senden(block, gruppe, daten) {
@@ -256,6 +353,12 @@
         hoch.onclick = () => { ant[f.id] = "hoch"; setz(); merken(); };
         runter.onclick = () => { ant[f.id] = "runter"; setz(); merken(); };
         setz(); k.appendChild(h("div", { class: "daumen" }, hoch, runter));
+      } else if (f.typ === "wolke") {
+        const n = Math.max(1, Math.min(5, f.anzahl || 3));
+        const start = Array.isArray(ant[f.id]) ? ant[f.id] : [];
+        const felder = Array.from({ length: n }, (_, i) => h("input", { type: "text", maxlength: 40, placeholder: n > 1 ? `Stichwort ${i + 1}` : "Stichwort", value: start[i] || "" }));
+        felder.forEach((x) => x.addEventListener("input", () => { const w = felder.map((y) => y.value); if (w.some((v) => v.trim())) ant[f.id] = w; else delete ant[f.id]; merken(); }));
+        k.append(h("div", { class: "small muted", style: { marginBottom: "6px" } }, n > 1 ? "Pro Feld ein Wort." : "Ein Wort oder ein kurzer Begriff."), ...felder.map((x) => h("div", { style: { marginBottom: "8px" } }, x)));
       } else if (f.typ === "auswahl") {
         const kn = (f.optionen || []).map((o) => h("button", { class: ant[f.id] === o ? "an" : "", onclick: () => { ant[f.id] = o; kn.forEach((x) => x.classList.toggle("an", x.textContent === o)); merken(); } }, o));
         k.appendChild(h("div", { class: "optionen" }, kn));
@@ -266,13 +369,23 @@
     const knopf = h("button", { class: "btn primaer gross", style: { width: "100%" } });
     const info = h("div", { class: "small muted", style: { textAlign: "center", marginTop: "6px" } });
     const aktual = () => {
-      const n = fragen.filter((f) => ant[f.id] !== undefined && ant[f.id] !== "").length;
+      const n = Object.keys(sauber()).length;
       const gleich = st.gesendet && JSON.stringify(st.gesendet.antworten) === JSON.stringify(sauber());
       knopf.disabled = !n || gleich;
       knopf.textContent = gleich ? "✓ Gesendet – herzlichen Dank!" : st.gesendet ? "Änderungen senden" : "Absenden";
       info.textContent = `${n} von ${fragen.length} Fragen beantwortet`;
     };
-    const sauber = () => { const o = {}; fragen.forEach((f) => { const v = ant[f.id]; if (v !== undefined && v !== "") o[f.id] = typeof v === "string" ? v.trim() : v; }); return o; };
+    const sauber = () => {
+      const o = {};
+      fragen.forEach((f) => {
+        let v = ant[f.id];
+        if (Array.isArray(v)) v = v.map((x) => String(x).trim()).filter(Boolean);
+        else if (typeof v === "string") v = v.trim();
+        if (v === undefined || v === "" || (Array.isArray(v) && !v.length)) return;
+        o[f.id] = v;
+      });
+      return o;
+    };
     knopf.addEventListener("click", async () => {
       knopf.disabled = true;
       const daten = { antworten: sauber() };

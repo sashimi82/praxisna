@@ -138,6 +138,9 @@
 
     // --- Teilnehmende (ohne Login)
     kursLaden(code) { return this.req("/rest/v1/rpc/kurs_laden", { method: "POST", body: { p_code: code }, auth: false }); }
+    memoryLaden(code, block, token) {
+      return this.req("/rest/v1/rpc/memory_laden", { method: "POST", auth: false, body: { p_code: code, p_block: block, p_token: token } });
+    }
     antwortSpeichern(code, block, token, gruppe, daten) {
       return this.req("/rest/v1/rpc/antwort_speichern", {
         method: "POST", auth: false,
@@ -186,7 +189,17 @@
       await this.pause();
       const k = this.db().kurse.find((x) => x.code.toUpperCase() === String(code).trim().toUpperCase());
       if (!k) return null;
-      return { id: k.id, titel: k.titel, bloecke: k.bloecke.filter((b) => b.offen).map(({ key, typ, titel, config }) => ({ key, typ, titel, config })) };
+      return { id: k.id, titel: k.titel, bloecke: k.bloecke.filter((b) => b.offen || b.memory).map(({ key, typ, titel, config, offen, memory }) => ({ key, typ, titel, config, offen: !!offen, memory: !!memory })) };
+    }
+    async memoryLaden(code, block, token) {
+      await this.pause();
+      const d = this.db();
+      const k = d.kurse.find((x) => x.code.toUpperCase() === String(code).trim().toUpperCase());
+      if (!k || !k.bloecke.some((b) => b.key === block && b.memory)) return [];
+      const out = [];
+      d.antworten.filter((a) => a.kurs_id === k.id && a.block_key === block && a.token !== token).forEach((a) =>
+        Object.entries((a.daten && a.daten.answers) || {}).forEach(([item, text]) => { if (String(text).trim()) out.push({ item, text, gruppe: a.gruppe }); }));
+      return out;
     }
     async antwortSpeichern(code, block, token, gruppe, daten) {
       await this.pause();

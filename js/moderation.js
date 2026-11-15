@@ -101,7 +101,7 @@
       h("div", { class: "zeile spread" }, h("span", { class: "chip" }, "Code ", k.code), h("span", { class: "small muted" }, PNA.datumText(k.datum))),
       h("h2", { style: { margin: "10px 0 8px" } }, k.titel),
       h("div", { class: "zeile" }, (k.bloecke || []).map((b) => h("div", { class: "hex typ-" + b.typ, title: b.titel, style: { width: "24px", height: "27px", fontSize: ".7rem" } }, PNA.TYPEN[b.typ].zeichen)),
-        (k.bloecke || []).some((b) => b.offen) ? h("span", { class: "chip ok" }, "offen") : null)))));
+        (k.bloecke || []).some((b) => b.offen || b.memory) ? h("span", { class: "chip ok" }, "offen") : null)))));
   }
 
   function bausteinWahl(bausteine, gewaehlt) {
@@ -178,9 +178,13 @@
         const vorlage = bausteine.find((v) => v.id === b.vorlage_id);
         ablauf.appendChild(h("div", { class: "liste-item" }, PNA.hex(b.typ),
           h("div", { class: "grow" }, h("div", { style: { fontWeight: 750, color: "#162c4a" } }, b.titel), h("div", { class: "zeile small muted", style: { marginTop: "4px" } }, PNA.TYPEN[b.typ].name, zaehler[b.key])),
-          h("label", { class: "switch", title: "Für Teilnehmende sichtbar" }, h("input", { type: "checkbox", checked: b.offen, onchange: (e) => {
-            const neu = clone(kurs.bloecke); neu[i].offen = e.target.checked; speichern(neu, e.target.checked ? "Für Teilnehmende geöffnet" : "Geschlossen");
-          } }), h("span", { class: "bahn" }), h("span", { class: "txt" }, b.offen ? "offen" : "zu")),
+          h("div", { style: { display: "flex", flexDirection: "column", gap: "6px" } },
+            h("label", { class: "switch", title: "Für Teilnehmende sichtbar" }, h("input", { type: "checkbox", checked: b.offen, onchange: (e) => {
+              const neu = clone(kurs.bloecke); neu[i].offen = e.target.checked; speichern(neu, e.target.checked ? "Für Teilnehmende geöffnet" : "Geschlossen");
+            } }), h("span", { class: "bahn" }), h("span", { class: "txt" }, b.offen ? "offen" : "zu")),
+            b.typ === "saetze" ? h("label", { class: "switch", title: "Memory mit den Sätzen der anderen Gruppen freigeben" }, h("input", { type: "checkbox", checked: !!b.memory, onchange: (e) => {
+              const neu = clone(kurs.bloecke); neu[i].memory = e.target.checked; speichern(neu, e.target.checked ? "Memory freigegeben" : "Memory geschlossen");
+            } }), h("span", { class: "bahn" }), h("span", { class: "txt" }, "Memory")) : null),
           h("a", { class: "btn primaer", href: `#/live/${kurs.id}/${b.key}` }, "Live-Ansicht"),
           h("div", { class: "zeile", style: { gap: "2px" } },
             h("button", { class: "icon-btn", title: "nach oben", disabled: i === 0, onclick: () => { const neu = clone(kurs.bloecke); [neu[i - 1], neu[i]] = [neu[i], neu[i - 1]]; speichern(neu); } }, "↑"),
@@ -203,7 +207,7 @@
         PNA.TYP_REIHENFOLGE.map((t) => h("optgroup", { label: PNA.TYPEN[t].name }, bausteine.filter((b) => b.typ === t).map((b) => h("option", { value: b.id }, b.titel)))));
       sel.addEventListener("change", () => { const v = bausteine.find((b) => b.id === sel.value); if (v) speichern([...(kurs.bloecke || []), blockAusVorlage(v)], "Hinzugefügt"); });
       ablauf.appendChild(h("div", { class: "zeile", style: { marginTop: "14px" } }, sel,
-        bl.some((b) => b.offen) ? h("button", { class: "btn klein", onclick: () => speichern(kurs.bloecke.map((b) => ({ ...b, offen: false })), "Alle geschlossen") }, "Alle schliessen") : null));
+        bl.some((b) => b.offen || b.memory) ? h("button", { class: "btn klein", onclick: () => speichern(kurs.bloecke.map((b) => ({ ...b, offen: false, memory: false })), "Alle geschlossen") }, "Alle schliessen") : null));
     }
 
     const titelEl = h("h1", null, kurs.titel);
@@ -222,7 +226,7 @@
               h("button", { class: "btn akzent", onclick: () => qrOverlay(kurs) }, "QR-Code auf Beamer zeigen"),
               h("button", { class: "btn", onclick: () => { navigator.clipboard.writeText(url).then(() => toast("Link kopiert"), () => prompt("Link kopieren:", url)); } }, "Link kopieren"),
               h("a", { class: "btn", href: url, target: "_blank" }, "Teilnahme-Seite öffnen"))))),
-      h("div", { class: "karte" }, h("h2", null, "Ablauf"), h("p", { class: "small muted" }, "Mit dem Schalter öffnest du einen Baustein für die Teilnehmenden. Die Live-Ansicht zeigt die Resultate für den Beamer."), ablauf),
+      h("div", { class: "karte" }, h("h2", null, "Ablauf"), h("p", { class: "small muted" }, "Mit dem Schalter öffnest du einen Baustein für die Teilnehmenden. Die Live-Ansicht zeigt die Resultate für den Beamer. Bei den Sätzen gibt der zweite Schalter das Memory frei: Jede Gruppe spielt mit den Formulierungen der anderen Gruppen."), ablauf),
       h("div", { style: { marginTop: "30px" } }, h("button", { class: "btn gefahr", onclick: async () => {
         if (!confirm(`Kurs «${kurs.titel}» mit allen Antworten endgültig löschen?`)) return;
         try { await api.kursLoeschen(kurs.id); toast("Kurs gelöscht"); gehe("#/"); } catch (e) { fehler(e); }
@@ -245,7 +249,7 @@
     if (!kurs) return gehe("#/");
     let block = kurs.bloecke.find((b) => b.key === key) || kurs.bloecke[0];
     if (!block) return gehe("#/kurs/" + id);
-    const zustand = { modus: "einzeln", idx: 0 };
+    const zustand = { modus: "einzeln", idx: 0, schnitt: PNA.ls.get("pna-schnitt", true) };
     let antworten = [], signatur = "";
 
     const steuerung = h("div", { class: "zeile no-print" });
@@ -294,6 +298,11 @@
         steuerung.appendChild(h("button", { class: "btn", onclick: () => { zustand.modus = zustand.modus === "alle" ? "einzeln" : "alle"; zeichnen(); } }, zustand.modus === "alle" ? "Satz für Satz" : "Alle Sätze"));
       }
       if (block.typ === "werte") steuerung.appendChild(h("button", { class: "btn", onclick: wolkeBild }, "Bild (PNG)"));
+      if (block.typ === "praesenz" || (block.typ === "auswertung" && (block.config.fragen || []).some((f) => f.typ === "skala"))) {
+        steuerung.appendChild(h("button", { class: "btn" + (zustand.schnitt ? "" : " aus"), title: "Durchschnitt ein-/ausblenden", onclick: () => {
+          zustand.schnitt = !zustand.schnitt; PNA.ls.set("pna-schnitt", zustand.schnitt); zeichnen();
+        } }, zustand.schnitt ? "Ø ausblenden" : "Ø einblenden"));
+      }
       steuerung.append(
         h("button", { class: "btn", onclick: drucken, title: "Im Druckdialog «Als PDF speichern» wählen" }, "PDF"),
         h("button", { class: "btn", onclick: () => PNA.csv(kurs, block, antworten.filter((a) => a.block_key === block.key)), title: "Tabelle für Excel" }, "CSV"),
@@ -336,7 +345,7 @@
     };
     document.addEventListener("keydown", tasten);
     let breite = window.innerWidth;
-    const groesse = () => { if (block.typ === "werte" && Math.abs(window.innerWidth - breite) > 30) { breite = window.innerWidth; zeichnen(); } };
+    const groesse = () => { if ((block.typ === "werte" || block.typ === "auswertung") && Math.abs(window.innerWidth - breite) > 30) { breite = window.innerWidth; zeichnen(); } };
     window.addEventListener("resize", groesse);
     aufraeumen.push(() => { document.removeEventListener("keydown", tasten); window.removeEventListener("resize", groesse); });
 
@@ -449,6 +458,7 @@
               f.typ = typSel.value;
               if (f.typ === "skala") { f.max = f.max || 10; f.links = f.links ?? "gar nicht"; f.rechts = f.rechts ?? "sehr"; }
               if (f.typ === "auswahl" && !f.optionen) f.optionen = ["Option 1", "Option 2"];
+              if (f.typ === "wolke" && !f.anzahl) f.anzahl = 3;
               zeichne();
             });
             const extra = [];
@@ -459,6 +469,11 @@
                 h("label", { class: "feld" }, h("span", null, "Bereich"), max),
                 h("label", { class: "feld", style: { flex: 1 } }, h("span", null, "Beschriftung links"), textFeld(f, "links")),
                 h("label", { class: "feld", style: { flex: 1 } }, h("span", null, "Beschriftung rechts"), textFeld(f, "rechts"))));
+            }
+            if (f.typ === "wolke") {
+              const anz = h("select", { style: { maxWidth: "160px" } }, [1, 2, 3, 4, 5].map((n) => h("option", { value: n }, n + (n === 1 ? " Stichwort" : " Stichworte")))); anz.value = f.anzahl || 3;
+              anz.addEventListener("change", () => (f.anzahl = parseInt(anz.value)));
+              extra.push(h("label", { class: "feld" }, h("span", null, "Stichworte pro Person"), anz));
             }
             if (f.typ === "auswahl") {
               const opt = h("textarea", { rows: 4 }); opt.value = (f.optionen || []).join("\n");

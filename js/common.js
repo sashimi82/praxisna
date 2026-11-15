@@ -66,6 +66,7 @@
     skala: "Skala",
     daumen: "Daumen hoch / runter",
     auswahl: "Auswahl (eine Option)",
+    wolke: "Wortwolke (Stichworte)",
   };
 
   PNA.leereConfig = function (typ) {
@@ -138,43 +139,59 @@
     return [...m.values()].sort((a, b) => b.n - a.n || a.text.localeCompare(b.text));
   };
 
-  PNA.zeichneWolke = function (canvas, woerter, breite) {
-    const W = Math.max(320, Math.round(breite)), H = Math.round(W * 0.52), dpr = 2;
+  PNA.zeichneWolke = function (canvas, woerter, breite, maxHoehe) {
+    const W = Math.max(320, Math.round(breite));
+    const H = Math.max(240, Math.round(Math.min(W * 0.52, maxHoehe || Infinity)));
+    const dpr = 2;
     canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.height = H + "px";
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
     ctx.textBaseline = "middle"; ctx.textAlign = "center";
+    const font = getComputedStyle(document.body).fontFamily;
     if (!woerter.length) {
-      ctx.fillStyle = "#9aa3b0"; ctx.font = `600 ${Math.round(W / 40)}px ${getComputedStyle(document.body).fontFamily}`;
-      ctx.fillText("Noch keine Werte – die Wolke wächst, sobald Antworten eintreffen.", W / 2, H / 2);
+      ctx.fillStyle = "#9aa3b0"; ctx.font = `600 ${Math.max(14, Math.round(W / 45))}px ${font}`;
+      ctx.fillText("Noch keine Antworten – die Wolke wächst, sobald Antworten eintreffen.", W / 2, H / 2);
       return;
     }
-    const font = getComputedStyle(document.body).fontFamily;
-    const max = woerter[0].n, min = woerter[woerter.length - 1].n;
-    const gross = W / 10, klein = Math.max(14, W / 50);
-    const plaziert = [];
-    const ueberlappt = (r) => plaziert.some((p) => r.x < p.x + p.w && r.x + r.w > p.x && r.y < p.y + p.h && r.y + r.h > p.y);
-    woerter.slice(0, 120).forEach((w, i) => {
-      let size = max === min ? (woerter.length < 8 ? gross * 0.75 : gross * 0.5) : klein + (gross - klein) * Math.sqrt((w.n - min) / (max - min));
-      for (let versuch = 0; versuch < 6; versuch++, size *= 0.82) {
-        ctx.font = `800 ${size}px ${font}`;
-        const tw = ctx.measureText(w.text).width + size * 0.3, th = size * 1.05;
-        let ok = null;
-        for (let t = 0; t < 2400; t += 1) {
-          const a = t * 0.11, rad = 1.2 * a;
-          const cx = W / 2 + rad * Math.cos(a) * 1.7, cy = H / 2 + rad * Math.sin(a);
-          const r = { x: cx - tw / 2, y: cy - th / 2, w: tw, h: th };
-          if (r.x < 4 || r.y < 4 || r.x + r.w > W - 4 || r.y + r.h > H - 4) { if (rad > W) break; continue; }
-          if (!ueberlappt(r)) { ok = { ...r, cx, cy }; break; }
+    const liste = woerter.slice(0, 150);
+    const max = liste[0].n, min = liste[liste.length - 1].n;
+    const gross0 = Math.min(W / 7.5, H / 3.2), klein0 = Math.max(13, gross0 / 5.5);
+    const basis = (w) => max === min ? (liste.length <= 6 ? gross0 * 0.7 : liste.length <= 20 ? gross0 * 0.45 : klein0 * 1.4) : klein0 + (gross0 - klein0) * Math.sqrt((w.n - min) / (max - min));
+    const rand = 3, luft = 0.12;
+    const versuche = (skala) => {
+      const plaziert = [];
+      const ueberlappt = (r) => { for (const p of plaziert) if (r.x < p.x + p.w && r.x + r.w > p.x && r.y < p.y + p.h && r.y + r.h > p.y) return true; return false; };
+      let fehlt = 0;
+      for (const w of liste) {
+        let size = Math.max(11, basis(w) * skala), ok = null;
+        for (let v = 0; v < 3 && !ok; v++, size = Math.max(10, size * 0.85)) {
+          ctx.font = `800 ${size}px ${font}`;
+          const tw = ctx.measureText(w.text).width + size * luft * 2, th = size * 1.08;
+          if (tw > W - 2 * rand) continue;
+          for (let t = 0; t < 9000; t++) {
+            const a = t * 0.045, rad = 0.55 * a;
+            const cx = W / 2 + rad * Math.cos(a) * (W / H), cy = H / 2 + rad * Math.sin(a);
+            if (rad * Math.min(1, W / H) > Math.max(W, H)) break;
+            const r = { x: cx - tw / 2, y: cy - th / 2, w: tw, h: th };
+            if (r.x < rand || r.y < rand || r.x + r.w > W - rand || r.y + r.h > H - rand) continue;
+            if (!ueberlappt(r)) { ok = { ...r, cx, cy, size, text: w.text }; break; }
+          }
         }
-        if (ok) {
-          plaziert.push(ok);
-          ctx.fillStyle = PNA.FARBEN[i % PNA.FARBEN.length];
-          ctx.fillText(w.text, ok.cx, ok.cy + size * 0.04);
-          break;
-        }
+        if (ok) plaziert.push(ok); else fehlt++;
       }
+      return { plaziert, fehlt };
+    };
+    let best = null;
+    for (let skala = 1, i = 0; i < 9; i++, skala *= 0.9) {
+      const r = versuche(skala);
+      if (!best || r.fehlt < best.fehlt) best = r;
+      if (!r.fehlt) break;
+    }
+    best.plaziert.forEach((p, i) => {
+      ctx.font = `800 ${p.size}px ${font}`;
+      ctx.fillStyle = PNA.FARBEN[i % PNA.FARBEN.length];
+      ctx.fillText(p.text, p.cx, p.cy + p.size * 0.04);
     });
   };
 
@@ -216,7 +233,8 @@
     },
 
     // Präsenz-Ebenen
-    praesenz(ziel, block, antworten) {
+    praesenz(ziel, block, antworten, zustand) {
+      const mitSchnitt = !(zustand && zustand.schnitt === false);
       const ebenen = block.config.ebenen || [];
       const wrap = h("div");
       ziel.appendChild(h("p", { class: "muted" }, anzahlText(antworten.length, "Einschätzung", "Einschätzungen"), " · anonym"));
@@ -226,14 +244,14 @@
         const maxN = Math.max(1, ...zaehl);
         const schnitt = werte.length ? werte.reduce((s, v) => s + v, 0) / werte.length : null;
         const farbe = PNA.EBENEN_FARBEN[ei % PNA.EBENEN_FARBEN.length];
-        wrap.appendChild(h("div", { class: "ebene" },
+        wrap.appendChild(h("div", { class: "ebene", style: mitSchnitt ? null : { gridTemplateColumns: "260px 1fr" } },
           h("div", null, h("div", { class: "zeile", style: { flexWrap: "nowrap", alignItems: "flex-start" } }, h("div", { class: "hex", style: { background: farbe, width: "26px", height: "30px" } }), h("div", { class: "name" }, e.name)),
             e.untertitel ? h("div", { class: "unter" }, e.untertitel) : null),
           h("div", null,
             h("div", { class: "histo" }, zaehl.map((n) => h("div", { class: "s" }, h("div", { class: "n" }, n || ""),
               h("div", { class: "bar", style: { height: (n / maxN) * 88 + "%", background: n ? farbe : "#e6eaf0" } })))),
             h("div", { class: "histo-achse" }, zaehl.map((_, i) => h("div", null, i + 1)))),
-          h("div", { class: "schnitt" }, h("div", { class: "wert" }, schnitt === null ? "–" : schnitt.toFixed(1).replace(".", ",")), h("div", { class: "lbl" }, "Durchschnitt"))));
+          mitSchnitt ? h("div", { class: "schnitt" }, h("div", { class: "wert" }, schnitt === null ? "–" : schnitt.toFixed(1).replace(".", ",")), h("div", { class: "lbl" }, "Durchschnitt")) : null));
       });
       ziel.appendChild(wrap);
     },
@@ -246,7 +264,11 @@
       const c = h("canvas", { class: "wolke" });
       const wrap = h("div", { class: "wolke-wrap" }, c);
       ziel.appendChild(wrap);
-      requestAnimationFrame(() => PNA.zeichneWolke(c, woerter, wrap.clientWidth - 20));
+      requestAnimationFrame(() => {
+        const top = wrap.getBoundingClientRect().top + window.scrollY;
+        const verfuegbar = window.innerHeight - top - 70;
+        PNA.zeichneWolke(c, woerter, wrap.clientWidth - 20, Math.max(320, verfuegbar));
+      });
       zustand.canvas = c;
       if (woerter.length) {
         ziel.appendChild(h("details", { class: "no-print", style: { marginTop: "14px" } }, h("summary", { class: "muted" }, "Alle Werte als Liste"),
@@ -255,7 +277,7 @@
     },
 
     // Auswertung
-    auswertung(ziel, block, antworten) {
+    auswertung(ziel, block, antworten, zustand) {
       const fragen = block.config.fragen || [];
       ziel.appendChild(h("p", { class: "muted" }, anzahlText(antworten.length, "Rückmeldung", "Rückmeldungen")));
       fragen.forEach((f, fi) => {
@@ -271,7 +293,7 @@
               h("div", { class: "histo", style: { gridTemplateColumns: `repeat(${max},1fr)` } }, z.map((n) => h("div", { class: "s" }, h("div", { class: "n" }, n || ""), h("div", { class: "bar", style: { height: (n / m) * 88 + "%", background: n ? farbe : "#e6eaf0" } })))),
               h("div", { class: "histo-achse", style: { gridTemplateColumns: `repeat(${max},1fr)` } }, z.map((_, i) => h("div", null, i + 1))),
               h("div", { class: "skala-enden" }, h("span", null, f.links || ""), h("span", null, f.rechts || ""))),
-            h("div", { class: "schnitt", style: { minWidth: "120px" } }, h("div", { class: "wert" }, schnitt === null ? "–" : schnitt.toFixed(1).replace(".", ",")), h("div", { class: "lbl" }, `Durchschnitt (n = ${werte.length})`))));
+            zustand && zustand.schnitt === false ? null : h("div", { class: "schnitt", style: { minWidth: "120px" } }, h("div", { class: "wert" }, schnitt === null ? "–" : schnitt.toFixed(1).replace(".", ",")), h("div", { class: "lbl" }, `Durchschnitt (n = ${werte.length})`))));
         } else if (f.typ === "daumen") {
           const hoch = werte.filter((v) => v === "hoch").length, runter = werte.filter((v) => v === "runter").length, t = Math.max(1, hoch + runter);
           k.appendChild(h("div", { class: "daumen-ergebnis" },
@@ -288,6 +310,12 @@
               h("div", { class: "balken" }, h("div", { style: { width: (n / t) * 100 + "%", background: PNA.EBENEN_FARBEN[oi % 8] } })),
               h("div", { style: { fontWeight: 750, color: "#162c4a" } }, `${n} (${Math.round((n / t) * 100)} %)`)));
           });
+        } else if (f.typ === "wolke") {
+          const woerter = PNA.zaehleWoerter(werte.flat());
+          const c = h("canvas", { class: "wolke" });
+          k.appendChild(h("p", { class: "small muted", style: { marginTop: "-6px" } }, `${werte.length} Personen · ${woerter.length} verschiedene Begriffe`));
+          k.appendChild(c);
+          requestAnimationFrame(() => PNA.zeichneWolke(c, woerter, k.clientWidth - 44, 360));
         } else {
           k.appendChild(werte.length ? h("div", { class: "text-antworten" }, werte.map((v) => h("div", { class: "ta" }, v))) : h("div", { class: "noch-leer" }, "Noch keine Antworten."));
         }
@@ -311,7 +339,7 @@
       antworten.forEach((a, i) => (a.daten.werte || []).forEach((w) => zeilen.push(["#" + (i + 1), w])));
     } else {
       zeilen.push(["Person", ...(c.fragen || []).map((f) => f.text)]);
-      antworten.forEach((a, i) => zeilen.push(["#" + (i + 1), ...(c.fragen || []).map((f) => (a.daten.antworten || {})[f.id] ?? "")]));
+      antworten.forEach((a, i) => zeilen.push(["#" + (i + 1), ...(c.fragen || []).map((f) => { const v = (a.daten.antworten || {})[f.id]; return Array.isArray(v) ? v.join(", ") : v ?? ""; })]));
     }
     const txt = "﻿" + zeilen.map((z) => z.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")).join("\r\n");
     const a = h("a", { href: URL.createObjectURL(new Blob([txt], { type: "text/csv;charset=utf-8" })), download: `${kurs.titel} - ${block.titel}.csv` });
