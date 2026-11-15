@@ -5,7 +5,14 @@
   if (api.demo) document.getElementById("demo-band").classList.remove("hidden");
 
   let timer = null, aufraeumen = [];
-  const stoppen = () => { clearInterval(timer); timer = null; aufraeumen.forEach((f) => f()); aufraeumen = []; document.body.classList.remove("live"); };
+  let praesi = false;
+  const stoppen = () => { clearInterval(timer); timer = null; aufraeumen.forEach((f) => f()); aufraeumen = []; document.body.classList.remove("live", "praesi"); };
+  const praesiBeenden = () => {
+    praesi = false; document.body.classList.remove("praesi");
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    window.dispatchEvent(new Event("resize"));
+  };
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && praesi) praesiBeenden(); });
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const gehe = (hash) => { location.hash = hash; };
   const fehler = (e) => { console.error(e); toast(e.message || "Es ist ein Fehler aufgetreten.", true); };
@@ -268,7 +275,7 @@
       h("div", { class: "print-kopf" }, h("img", { src: "assets/logo.png", alt: "praxisNA" }), h("div", { class: "muted" }, kurs.titel, kurs.datum ? " · " + PNA.datumText(kurs.datum) : "")),
       h("div", { class: "live-titel" }, h("div", null, h("h1", null, block.titel)), offenSchalter), inhalt);
     app.appendChild(main);
-    app.appendChild(h("div", { class: "live-fuss" }, h("span", null, h("span", { class: "puls" }), "live"),
+    app.appendChild(h("div", { class: "live-fuss" }, h("span", { class: "no-print" }, h("span", { class: "puls" }), "live"),
       h("span", null, "Mitmachen: ", h("b", { style: { letterSpacing: "0" } }, PNA.teilnahmeUrlKurz(kurs.code)), " · Code ", h("b", null, kurs.code))));
 
     const aktionen = block.typ === "saetze" ? {
@@ -282,9 +289,64 @@
     function zeichnen() {
       PNA.leeren(inhalt);
       const eigene = antworten.filter((a) => a.block_key === block.key);
+      inhalt.style.transform = ""; inhalt.style.width = ""; inhalt.style.marginBottom = "";
       PNA.resultate[block.typ](inhalt, block, eigene, zustand, aktionen);
       zeichneSteuerung();
+      zeichneLeiste();
+      if (block.typ === "praesenz") requestAnimationFrame(einpassen);
     }
+    // Präsenz: so verkleinern, dass alles ohne Scrollen sichtbar ist
+    function einpassen() {
+      const zuruecksetzen = () => { inhalt.style.transform = ""; inhalt.style.width = ""; inhalt.style.marginBottom = ""; };
+      zuruecksetzen();
+      const unten = parseFloat(getComputedStyle(main).paddingBottom) || 0;
+      const verfuegbar = window.innerHeight - (inhalt.getBoundingClientRect().top + window.scrollY) - unten - 4;
+      if (verfuegbar < 120 || inhalt.scrollHeight <= verfuegbar) return;
+      const setze = (sk) => { inhalt.style.transformOrigin = "top left"; inhalt.style.transform = `scale(${sk})`; inhalt.style.width = 100 / sk + "%"; };
+      const passt = (sk) => { setze(sk); return inhalt.scrollHeight * sk <= verfuegbar; };
+      let lo = 0.3, hi = 1;
+      for (let i = 0; i < 8; i++) { const mid = (lo + hi) / 2; if (passt(mid)) lo = mid; else hi = mid; }
+      setze(lo);
+      inhalt.style.marginBottom = -(inhalt.scrollHeight * (1 - lo)) + "px";
+    }
+    // Schwebende Leiste im Präsentationsmodus
+    const leiste = h("div", { class: "praesi-leiste" });
+    app.appendChild(leiste);
+    function zeichneLeiste() {
+      PNA.leeren(leiste);
+      const idx = kurs.bloecke.findIndex((b) => b.key === block.key);
+      if (block.typ === "saetze" && zustand.modus === "einzeln") {
+        const n = (block.config.items || []).length;
+        leiste.append(
+          h("button", { class: "btn", disabled: zustand.idx <= 0, onclick: () => { zustand.idx--; zeichnen(); } }, "← Satz"),
+          h("span", { class: "stand" }, `${zustand.idx + 1} / ${n}`),
+          h("button", { class: "btn", disabled: zustand.idx >= n - 1, onclick: () => { zustand.idx++; zeichnen(); } }, "Satz →"),
+          h("span", { class: "trenner" }));
+      }
+      leiste.append(
+        h("button", { class: "btn", disabled: idx <= 0, title: "Vorheriger Baustein", onclick: () => gehe(`#/live/${id}/${kurs.bloecke[idx - 1].key}`) }, "‹ Baustein"),
+        h("button", { class: "btn", disabled: idx >= kurs.bloecke.length - 1, title: "Nächster Baustein", onclick: () => gehe(`#/live/${id}/${kurs.bloecke[idx + 1].key}`) }, "Baustein ›"),
+        h("button", { class: "btn akzent", onclick: praesiBeenden }, "✕ Beenden"));
+    }
+    let leisteTimer;
+    const bewegung = () => {
+      if (!praesi) return;
+      leiste.classList.add("zeigen"); document.body.classList.remove("ruhig");
+      clearTimeout(leisteTimer);
+      leisteTimer = setTimeout(() => { leiste.classList.remove("zeigen"); document.body.classList.add("ruhig"); }, 2500);
+    };
+    document.addEventListener("mousemove", bewegung);
+    document.addEventListener("touchstart", bewegung, { passive: true });
+    aufraeumen.push(() => { document.removeEventListener("mousemove", bewegung); document.removeEventListener("touchstart", bewegung); clearTimeout(leisteTimer); });
+    function praesiStarten() {
+      praesi = true; document.body.classList.add("praesi");
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+      window.dispatchEvent(new Event("resize"));
+      window.scrollTo(0, 0);
+      bewegung();
+    }
+    if (praesi) { document.body.classList.add("praesi"); }
     function zeichneSteuerung() {
       PNA.leeren(steuerung);
       if (block.typ === "saetze") {
@@ -312,7 +374,7 @@
       steuerung.append(
         h("button", { class: "btn", onclick: drucken, title: "Im Druckdialog «Als PDF speichern» wählen" }, "PDF"),
         h("button", { class: "btn", onclick: () => PNA.csv(kurs, block, antworten.filter((a) => a.block_key === block.key)), title: "Tabelle für Excel" }, "CSV"),
-        h("button", { class: "btn", onclick: () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen && document.documentElement.requestFullscreen()) }, "⛶"));
+        h("button", { class: "btn primaer", onclick: praesiStarten, title: "Vollbild ohne Bedienelemente" }, "▶ Präsentieren"));
     }
     function drucken() {
       const vorher = zustand.modus;
@@ -344,14 +406,15 @@
       } catch (e) { console.warn(e); }
     }
     const tasten = (e) => {
+      if (e.key === "Escape" && praesi) { praesiBeenden(); return; }
       if (block.typ !== "saetze" || zustand.modus !== "einzeln" || /input|textarea/i.test(e.target.tagName)) return;
       const n = (block.config.items || []).length;
       if ((e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") && zustand.idx < n - 1) { e.preventDefault(); zustand.idx++; zeichnen(); }
       if ((e.key === "ArrowLeft" || e.key === "PageUp") && zustand.idx > 0) { e.preventDefault(); zustand.idx--; zeichnen(); }
     };
     document.addEventListener("keydown", tasten);
-    let breite = window.innerWidth;
-    const groesse = () => { if ((block.typ === "werte" || block.typ === "auswertung") && Math.abs(window.innerWidth - breite) > 30) { breite = window.innerWidth; zeichnen(); } };
+    let groesseTimer;
+    const groesse = () => { clearTimeout(groesseTimer); groesseTimer = setTimeout(() => { if (block.typ !== "saetze") zeichnen(); }, 250); };
     window.addEventListener("resize", groesse);
     aufraeumen.push(() => { document.removeEventListener("keydown", tasten); window.removeEventListener("resize", groesse); });
 

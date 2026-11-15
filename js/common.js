@@ -286,7 +286,9 @@
       ziel.appendChild(wrap);
       requestAnimationFrame(() => {
         const top = wrap.getBoundingClientRect().top + window.scrollY;
-        const verfuegbar = window.innerHeight - top - 70;
+        const main = wrap.closest(".live-main");
+        const unten = main ? parseFloat(getComputedStyle(main).paddingBottom) || 0 : 70;
+        const verfuegbar = window.innerHeight - top - unten - 26;
         PNA.zeichneWolke(c, woerter, wrap.clientWidth - 20, Math.max(320, verfuegbar));
       });
       zustand.canvas = c;

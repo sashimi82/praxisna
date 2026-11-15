@@ -145,7 +145,7 @@ body.live{background:#fff}
 .live-kopf .tabs{display:flex;gap:4px;flex:1;flex-wrap:wrap}
 .live-kopf .tabs a{text-decoration:none;color:var(--muted);font-weight:650;padding:7px 12px;border-radius:10px;font-size:.92rem}
 .live-kopf .tabs a.aktiv{background:#eef1f6;color:var(--navy)}
-.live-main{padding:26px 40px 70px;max-width:1500px;margin:0 auto}
+.live-main{padding:26px 40px 48px;max-width:1500px;margin:0 auto}
 .live-titel{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:14px}
 .live-titel h1{font-size:2rem;margin:0}
 .live-fuss{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.95);border-top:1px solid var(--line);padding:8px 24px;font-size:.95rem;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
@@ -272,3 +272,15 @@ canvas.wolke{width:100%;display:block}
 .pe-kreis{border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.9rem;transition:width .3s,height .3s}
 .pe-wert{font-weight:850;color:var(--navy);font-size:1.25rem}
 @media (max-width:760px){.pe-zeile{grid-template-columns:1fr;gap:4px}.pe-zeile .pe-name{padding-bottom:0}}
+
+/* ================= Präsentationsmodus ================= */
+body.praesi .live-kopf,body.praesi .demo-band,body.praesi .no-print{display:none!important}
+body.praesi .live-main{padding-top:30px}
+body.praesi.ruhig{cursor:none}
+.praesi-leiste{position:fixed;right:18px;bottom:50px;z-index:60;display:none;align-items:center;gap:6px;background:rgba(255,255,255,.97);
+  border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 8px 28px rgba(22,44,74,.18);opacity:0;transition:opacity .3s;pointer-events:none}
+body.praesi .praesi-leiste{display:flex}
+body.praesi .praesi-leiste.zeigen{opacity:1;pointer-events:auto}
+.praesi-leiste .stand{font-weight:750;color:var(--navy);padding:0 4px}
+.praesi-leiste .trenner{width:1px;height:26px;background:var(--line);margin:0 4px}
+@media print{.praesi-leiste{display:none!important}}
