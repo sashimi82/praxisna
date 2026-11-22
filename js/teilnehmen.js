@@ -111,12 +111,40 @@
     try { daten = await api.memoryLaden(S.code, block.key, S.token); }
     catch (e) { PNA.leeren(bereich).appendChild(h("div", { class: "karte" }, "Die Karten konnten nicht geladen werden. Bitte versuche es nochmals.")); return; }
     const items = block.config.items || [];
-    const pool = items.map((it) => ({ it, antworten: daten.filter((d) => d.item === it.id) })).filter((x) => x.antworten.length);
-    if (pool.length < 2) {
-      PNA.leeren(bereich).appendChild(h("div", { class: "karte leer" }, h("p", null, "Es gibt noch zu wenige Sätze der anderen Gruppen."),
-        h("button", { class: "btn primaer", onclick: zeigen }, "Nochmals versuchen")));
-      return;
-    }
+    const norm = (g) => String(g || "").trim().toLocaleLowerCase("de-CH");
+    // Hat dieses Handy selbst Sätze geschrieben? Dann sind die eigenen schon ausgeschlossen.
+    const eigeneGruppe = (lokal(block.key).gruppe || "").trim();
+    const gruppenKey = `pna-${S.code}-${block.key}-memgruppe`;
+    const gruppenNamen = [...new Map(daten.filter((d) => (d.gruppe || "").trim()).map((d) => [norm(d.gruppe), d.gruppe.trim()])).values()]
+      .sort((a, b) => a.localeCompare(b, "de-CH", { numeric: true }));
+    let meineGruppe = eigeneGruppe || PNA.ls.get(gruppenKey, null);
+    let pool = [];
+    const poolBerechnen = () => {
+      const ohne = meineGruppe ? norm(meineGruppe) : null;
+      pool = items.map((it) => ({ it, antworten: daten.filter((d) => d.item === it.id && (!ohne || norm(d.gruppe) !== ohne)) })).filter((x) => x.antworten.length);
+    };
+    const gruppeWaehlen = () => {
+      PNA.leeren(bereich);
+      bereich.append(
+        h("div", { class: "karte" }, h("h2", null, "Zu welcher Gruppe gehört ihr?"),
+          h("p", { class: "muted small" }, "Damit ihr im Memory nur die Sätze der anderen Gruppen bekommt."),
+          h("div", { class: "optionen" }, gruppenNamen.map((g) => h("button", { onclick: () => { meineGruppe = g; PNA.ls.set(gruppenKey, g); weiter(); } }, g))),
+          h("button", { class: "btn klein", style: { marginTop: "6px" }, onclick: () => { meineGruppe = ""; PNA.ls.set(gruppenKey, ""); weiter(); } }, "Wir waren in keiner dieser Gruppen")));
+    };
+    const weiter = () => {
+      poolBerechnen();
+      if (pool.length < 2) {
+        PNA.leeren(bereich).appendChild(h("div", { class: "karte leer" }, h("p", null, "Es gibt noch zu wenige Sätze der anderen Gruppen."),
+          h("button", { class: "btn primaer", onclick: zeigen }, "Nochmals versuchen"),
+          !eigeneGruppe && gruppenNamen.length ? h("div", { style: { marginTop: "10px" } }, h("button", { class: "btn klein", onclick: gruppeWaehlen }, "Andere Gruppe wählen")) : null));
+        return;
+      }
+      auswahl();
+    };
+    const gruppenInfo = () => meineGruppe
+      ? h("p", { class: "small muted" }, "Eure Gruppe: ", h("b", null, meineGruppe), " – deren Sätze sind nicht im Spiel. ",
+          eigeneGruppe ? null : h("a", { href: "#", onclick: (e) => { e.preventDefault(); gruppeWaehlen(); } }, "ändern"))
+      : gruppenNamen.length ? h("p", { class: "small muted" }, "Alle Gruppen im Spiel. ", h("a", { href: "#", onclick: (e) => { e.preventDefault(); gruppeWaehlen(); } }, "Gruppe wählen")) : null;
     const mischen = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
     let mitSymbolen = PNA.ls.get("pna-memory-symbole", true);
     const auswahl = () => {
@@ -132,6 +160,7 @@
       zeichneStufe();
       bereich.append(h("p", null, "Findet die Paare: Zu jedem Satz der ", h("b", { style: { color: "var(--bordeaux)" } }, "alten Autorität"), " gehört eine Formulierung der ",
         h("b", { style: { color: "#17673a" } }, "neuen Autorität"), " – geschrieben von einer anderen Gruppe."),
+        gruppenInfo(),
         h("p", { class: "muted small", style: { marginBottom: "6px" } }, "1. Schwierigkeit wählen"), stufe,
         h("p", { class: "muted small", style: { margin: "16px 0 6px" } }, "2. Wie viele Paare möchtet ihr spielen?"),
         h("div", { class: "zeile" }, optionen.map((k) => h("button", { class: "btn akzent", onclick: () => spiel(k) }, k === n ? `Alle (${k})` : `${k} Paare`))));
@@ -182,7 +211,7 @@
       bereich.append(stand, h("p", { class: "small muted", style: { marginTop: 0 } }, "Tippe zwei Karten an. Passen sie nicht, tippe einfach weiter."), grid);
       els.forEach((e) => grid.appendChild(e));
     };
-    auswahl();
+    if (meineGruppe === null && gruppenNamen.length) gruppeWaehlen(); else weiter();
   }
 
   async function senden(block, gruppe, daten) {
