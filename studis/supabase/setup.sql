@@ -158,3 +158,8 @@ grant execute on function public.sb_postit_loeschen(text, uuid, uuid) to anon, a
 grant execute on function public.sb_geloest_melden(text, uuid, text) to anon, authenticated;
 
 -- Fertig. Prüfen: select * from public.sb_treffen;
+
+-- Update 2: freie Positionen der Post-its auf der Beamer-Wand
+alter table public.sb_postits add column if not exists pos_x real;
+alter table public.sb_postits add column if not exists pos_y real;
+alter table public.sb_postits add column if not exists pos_z integer not null default 0;
