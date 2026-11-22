@@ -43,6 +43,7 @@
   };
   SB.REIHENFOLGE = ["einstieg", "ideen", "best", "heraus"];
   SB.SAMMLUNGEN = ["ideen", "best", "heraus"];
+  SB.UEBERSICHT = ["best", "heraus", "ideen"]; // Reihenfolge in «Alle Sammlungen», Druck und CSV
   SB.POSTIT_FARBEN = { gelb: "#fbf3b0", pink: "#ff9fcf", gruen: "#c9ebbd", blau: "#c5e0fa" };
 
   // Logo: assets/logo.png (Stadt Winterthur); fehlt die Datei, steht Text da
@@ -75,7 +76,7 @@
   SB.csv = function (treffen, postits) {
     const z = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
     const zeilen = [["Sammlung", "Text", "Farbe", "Von", "Zeit"].map(z).join(";")];
-    SB.SAMMLUNGEN.forEach((b) => postits.filter((p) => p.block === b).forEach((p) =>
+    SB.UEBERSICHT.forEach((b) => postits.filter((p) => p.block === b).forEach((p) =>
       zeilen.push([SB.BLOECKE[b].titel, p.text, p.farbe, p.token ? "Teilnehmende" : "Moderation", new Date(p.created_at).toLocaleString("de-CH")].map(z).join(";"))));
     const blob = new Blob(["﻿" + zeilen.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = h("a", { href: URL.createObjectURL(blob), download: "postits-" + treffen.code + ".csv" });

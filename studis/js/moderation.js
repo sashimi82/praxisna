@@ -145,7 +145,7 @@
     let t = await api.treffen(tid);
     if (!t) return uebersicht();
     const druck = q.get("druck") === "1";
-    let tab = SB.ls.get("sb-live-tab-" + t.id, "einstieg"), postits = [], geloest = [], signatur = "", gesehen = null, menue = null;
+    let tab = SB.ls.get("sb-live-tab-" + t.id, "einstieg"), postits = [], geloest = [], signatur = "", gesehen = {}, menue = null;
     const tabs = h("div", { class: "tabs" });
     const flaeche = h("div");
     leeren(app).append(
@@ -161,7 +161,7 @@
     }
     function tabsZeichnen() {
       leeren(tabs);
-      REIHENFOLGE.forEach((b) => tabs.append(h("button", { class: tab === b ? "an" : "", onclick: () => { tab = b; SB.ls.set("sb-live-tab-" + t.id, b); gesehen = null; zeichnen(true); } }, BLOECKE[b].titel)));
+      REIHENFOLGE.concat(["alle"]).forEach((b) => tabs.append(h("button", { class: tab === b ? "an" : "", onclick: () => { tab = b; SB.ls.set("sb-live-tab-" + t.id, b); gesehen = {}; scrollTo(0, 0); zeichnen(true); } }, b === "alle" ? "Alle Sammlungen" : BLOECKE[b].titel)));
     }
     function menueZu() { if (menue) { menue.remove(); menue = null; } }
     document.addEventListener("click", (e) => { if (menue && !menue.contains(e.target) && !e.target.closest(".wand .postit")) menueZu(); });
@@ -184,7 +184,7 @@
         h("div", { class: "denk-grid" }, karte("punkte"), karte("muenzen")));
     }
     // ---- Freie Post-it-Wand: Positionen relativ zur Wandbreite (pos_x, pos_y in Breiten-Einheiten) ----
-    let ziehtGerade = false, wandAktuell = null;
+    let ziehtGerade = false, wandListe = [];
     const stabileDrehung = (id) => { let s = 0; for (const ch of String(id)) s = (s * 31 + ch.charCodeAt(0)) | 0; return ((Math.abs(s) % 25) - 12) / 10; };
     const textFaktor = (tx) => { const n = String(tx).length; return n <= 12 ? 1 : n <= 24 ? 0.86 : n <= 45 ? 0.72 : n <= 80 ? 0.6 : 0.5; };
     function masse(wand) { const W = wand.clientWidth || 1000; const pw = Math.max(150, Math.min(260, W * 0.145)); return { W, pw, ph: pw * 0.72, gap: pw * 0.1 }; }
@@ -196,12 +196,12 @@
       }
       return { x: 0, y: 0 };
     }
-    function sammlung(b, frei) {
+    function sammlung(b, frei, kompakt) {
       const z = t.zustand, B = BLOECKE[b];
       const liste = postits.filter((p) => p.block === b);
-      const neueIds = gesehen ? liste.filter((p) => !gesehen.has(p.id)).map((p) => p.id) : [];
-      gesehen = new Set(liste.map((p) => p.id));
-      const wand = h("div", { class: "wand" + (frei ? " frei" : "") });
+      const neueIds = gesehen[b] ? liste.filter((p) => !gesehen[b].has(p.id)).map((p) => p.id) : [];
+      gesehen[b] = new Set(liste.map((p) => p.id));
+      const wand = h("div", { class: "wand" + (frei ? " frei" : "") + (kompakt ? " kompakt" : "") });
       if (!liste.length) wand.append(h("div", { class: "leer", style: { width: "100%" } }, z.offen[b] ? "Noch keine Post-its – die Wand füllt sich live." : "Diese Sammlung ist noch zu. Öffne sie mit dem Schalter oben rechts."));
       liste.forEach((p) => {
         const el = h("div", { class: "postit" + (neueIds.includes(p.id) ? " neu-rein" : ""), style: { background: POSTIT_FARBEN[p.farbe] || POSTIT_FARBEN.gelb } }, p.text);
@@ -209,21 +209,21 @@
         if (!frei) el.addEventListener("click", (e) => { e.stopPropagation(); postitMenue(p, el); });
         wand.append(el);
       });
-      if (frei) wandAktuell = { wand, b };
+      if (frei) wandListe.push({ wand, b });
       return flip(b,
-        h("div", { class: "flip-kopf" }, h("img", { src: B.bild, alt: B.titel }),
+        h("div", { class: "flip-kopf" + (kompakt ? " kompakt" : "") }, h("img", { src: B.bild, alt: B.titel }),
           h("div", null, h("div", { class: "zahl" }, h("b", null, liste.length), liste.length === 1 ? "Post-it" : "Post-its"),
-            frei ? h("div", { class: "flip-werkzeug" },
+            frei && !kompakt ? h("div", { class: "flip-werkzeug" },
               h("button", { class: "btn klein", onclick: () => neuesPostit(b) }, "+ Post-it"),
               h("button", { class: "btn klein", disabled: !liste.length, onclick: () => aufraeumen(b) }, "Aufräumen"),
               schalter(z.offen[b] ? "offen" : "zu", !!z.offen[b], (an) => zustandSetzen((zz) => (zz.offen[b] = an)))) : null)),
-        h("p", { class: "muted", style: { fontSize: "1.1rem", margin: "0 0 14px" } }, B.frage),
+        kompakt ? null : h("p", { class: "muted", style: { fontSize: "1.1rem", margin: "0 0 14px" } }, B.frage),
         wand);
     }
     // nach dem Einfügen ins DOM: Grösse, Position, Ziehen
-    function wandAnordnen() {
-      if (!wandAktuell) return;
-      const { wand } = wandAktuell, m = masse(wand), els = [...wand.querySelectorAll(".postit")];
+    function wandAnordnen() { wandListe.forEach(({ wand }) => eineWandAnordnen(wand)); }
+    function eineWandAnordnen(wand) {
+      const m = masse(wand), els = [...wand.querySelectorAll(".postit")];
       wand.style.setProperty("--pw", m.pw + "px");
       let maxZ = 0;
       els.forEach((el) => { const p = el._p;
@@ -238,7 +238,7 @@
         p.pos_x = f.x / m.W; p.pos_y = f.y / m.W; p.pos_z = 0;
         api.postitAendern(p.id, { pos_x: p.pos_x, pos_y: p.pos_y, pos_z: 0 }).catch(() => {}); // Platz merken, damit nichts mehr verrutscht
       });
-      const hoehe = () => { wand.style.height = Math.max(innerHeight * 0.55, ...els.map((el) => el.offsetTop + el.offsetHeight + 40)) + "px"; };
+      const hoehe = () => { wand.style.height = Math.max(wand.classList.contains("kompakt") ? 140 : innerHeight * 0.55, ...els.map((el) => el.offsetTop + el.offsetHeight + 40)) + "px"; };
       hoehe();
       els.forEach((el) => ziehbar(el, wand, m, () => ++maxZ, hoehe));
     }
@@ -277,7 +277,7 @@
       if (!confirm("Alle Post-its neu in Reihen anordnen (nach Farbe sortiert)? Deine Gruppierung geht dabei verloren.")) return;
       const ord = Object.keys(POSTIT_FARBEN);
       const liste = postits.filter((p) => p.block === b).sort((x, y) => ord.indexOf(x.farbe) - ord.indexOf(y.farbe) || x.created_at.localeCompare(y.created_at));
-      const m = masse(wandAktuell.wand), cols = Math.max(1, Math.floor((m.W + m.gap) / (m.pw + m.gap)));
+      const m = masse(wandListe.find((w) => w.b === b).wand), cols = Math.max(1, Math.floor((m.W + m.gap) / (m.pw + m.gap)));
       const zeilenH = m.ph + m.gap * 1.6;
       await Promise.all(liste.map((p, i) => { p.pos_x = ((i % cols) * (m.pw + m.gap)) / m.W; p.pos_y = (Math.floor(i / cols) * zeilenH) / m.W; p.pos_z = 0; return api.postitAendern(p.id, { pos_x: p.pos_x, pos_y: p.pos_y, pos_z: 0 }); }));
       zeichnen(true);
@@ -304,7 +304,7 @@
     }
     function druckAnsicht() {
       leeren(flaeche);
-      SAMMLUNGEN.forEach((b) => { tab = b; gesehen = null; flaeche.append(sammlung(b, false)); });
+      SB.UEBERSICHT.forEach((b) => { gesehen = {}; flaeche.append(sammlung(b, false)); });
       setTimeout(() => window.print(), 600);
     }
     const signaturBerechnen = () => JSON.stringify([tab, t.zustand, postits.map((p) => [p.id, p.text, p.farbe, p.pos_x, p.pos_y, p.pos_z]), geloest.length]);
@@ -313,9 +313,10 @@
       const sig = signaturBerechnen();
       if (!erzwingen && sig === signatur) return;
       if (menue && !erzwingen) return; // nicht unter dem offenen Menü neu zeichnen
-      signatur = sig; menueZu(); tabsZeichnen(); wandAktuell = null;
+      signatur = sig; menueZu(); tabsZeichnen(); wandListe = [];
       const scrollPos = scrollY;
-      leeren(flaeche).append(tab === "einstieg" ? einstieg() : sammlung(tab, true));
+      if (tab === "alle") leeren(flaeche).append(...SB.UEBERSICHT.map((b) => sammlung(b, true, true)));
+      else leeren(flaeche).append(tab === "einstieg" ? einstieg() : sammlung(tab, true));
       wandAnordnen();
       signatur = signaturBerechnen();
       window.scrollTo(0, scrollPos);
